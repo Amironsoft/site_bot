@@ -2,6 +2,7 @@ from pprint import pprint
 
 from elasticsearch import Elasticsearch
 
+
 s = """
 ВИДЫ ОКАЗЫВАЕМЫХ УСЛУГ ЦЕНТРА ОБСЛУЖИВАНИЯ
 
@@ -69,12 +70,15 @@ def prepare_content_dict():
 
 
 def print_res(res):
-    if len(res['hits']['hits'])>0:
-        print("возможно вы искали: ")
+    if len(res['hits']['hits']) > 0:
+        ans_list = ["возможно вы искали: "]
         for item in res['hits']['hits']:
-            print("\t", item['_source']["chapter"], item['_source']["text"])
+            ans_line = " ".join(["_____", item['_source']["chapter"], item['_source']["text"]])
+            if ans_line not in ans_list:
+                ans_list.append(ans_line)
+        return "<br>\n".join(ans_list)
     else:
-        print("уточните пожалуйста")
+        return "уточните пожалуйста"
 
 
 def clean_query(query):
@@ -87,29 +91,32 @@ def clean_query(query):
     return query
 
 
-if __name__ == '__main__':
-    content_dict = prepare_content_dict()
-    pprint(content_dict)
-    es = Elasticsearch()
+def get_answer(query):
+    if len(query) >= 3:
+        query = clean_query(query)
+        res = es.search(index="some-index", body={'query': {'match': {'text': query}}})
+        ans = print_res(res)
+    else:
+        ans = "уточните пожалуйста"
+    return ans
 
+
+def initialize():
+    global es
+    content_dict = prepare_content_dict()
+    # pprint(content_dict)
+    es = Elasticsearch()
+    print("Здравствуйте! Чем могу помочь?")
     for i, (chapter, chapter_content) in enumerate(content_dict.items()):
         for cur_line in chapter_content:
             doc = {"chapter": chapter,
                    "text": cur_line}
             res = es.index(index="some-index", doc_type="text", body=doc)
 
-    print("Здравствуйте! Чем могу помочь?")
+initialize()
 
+if __name__ == '__main__':
+    initialize()
     while True:
-        query = input(">:")
-
-        if query == "0":
-            break
-        else:
-            if len(query) > 4:
-                query = clean_query(query)
-                res = es.search(index="some-index", body={'query': {'match': {'text': query}}})
-                print_res(res)
-            else:
-                print("уточните пожалуйста")
-                continue
+        question = input(">:")
+        print(get_answer(question))
